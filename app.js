@@ -1,6 +1,8 @@
 'use strict';
 const $=id=>document.getElementById(id),isExtension=!!globalThis.chrome?.runtime?.id;
-const state={library:[],selected:null,model:null,keywords:[],capture:null,busy:false,plan:{},source:'',revision:0,fileMode:'add',previewURL:null};
+const viewParams=new URLSearchParams(location.search),isSidebar=viewParams.get('view')==='sidebar';
+document.body.classList.toggle('sidebar',isSidebar);
+const state={windowId:null,pendingCapture:null,pendingWorkflow:null,ready:false,library:[],selected:null,model:null,keywords:[],capture:null,busy:false,plan:{},source:'',revision:0,fileMode:'add',previewURL:null};
 const store={async get(key){if(isExtension)return (await chrome.storage.local.get(key))[key];return JSON.parse(localStorage.getItem(key)||'null');},async set(key,value){if(isExtension)return chrome.storage.local.set({[key]:value});localStorage.setItem(key,JSON.stringify(value));}};
 const dbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open('skills-tailor',1);req.onupgradeneeded=()=>req.result.createObjectStore('resumes',{keyPath:'id'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
 async function db(mode,action){const d=await dbPromise;return new Promise((resolve,reject)=>{const tx=d.transaction('resumes',mode),r=action(tx.objectStore('resumes'));let result;r.onsuccess=()=>result=r.result;tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
@@ -9,7 +11,7 @@ function status(message,error=false){$('status').hidden=!message;$('status').tex
 function element(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function clearPlan(){state.plan={};$('review').hidden=true;$('replacement-rows').replaceChildren();}
 function invalidateKeywords(){state.revision++;state.keywords=[];state.source='';clearPlan();$('keyword-editor').hidden=true;renderScore();}
-function setBusy(value){state.busy=value;for(const id of ['analyze','suggest','download','resume-select','add-resume','replace-resume','remove-resume','rename-resume','use-simplify','import-keywords','add-keyword','reset-changes','manual'])$(id).disabled=value;for(const input of $('replacement-rows').querySelectorAll('input'))input.disabled=value;for(const b of $('editable-chips').querySelectorAll('button'))b.disabled=value;if(!value){$('use-simplify').disabled=!state.capture?.simplify?.keywords?.length;$('resume-select').disabled=!state.library.length;updatePlan();}}
+function setBusy(value){state.busy=value;for(const id of ['analyze','suggest','download','resume-select','add-resume','replace-resume','remove-resume','rename-resume','use-simplify','import-keywords','add-keyword','reset-changes','manual','open-full-page','open-sidebar','refresh-job'])$(id).disabled=value;for(const input of $('replacement-rows').querySelectorAll('input'))input.disabled=value;for(const b of $('editable-chips').querySelectorAll('button'))b.disabled=value;if(!value){$('use-simplify').disabled=!state.capture?.simplify?.keywords?.length;$('resume-select').disabled=!state.library.length;updatePlan();if(state.ready&&state.pendingCapture){const capture=state.pendingCapture;state.pendingCapture=null;applyCapture(capture);}else if(state.ready&&state.pendingWorkflow){const draft=state.pendingWorkflow;state.pendingWorkflow=null;restoreWorkflow(draft).catch(e=>status(e.message,true));}}}
 async function task(fn){if(state.busy)return;setBusy(true);status('');try{await fn();}catch(e){status(e.message||String(e),true);}finally{setBusy(false);}}
 function libraryOptions(){const sel=$('resume-select');sel.replaceChildren();for(const r of state.library){const o=element('option',r.name);o.value=r.id;sel.append(o);}sel.value=state.selected||'';sel.disabled=!state.library.length;}
 async function selectResume(id){state.revision++;state.selected=id;state.model=null;clearPlan();if(!id){$('resume-meta').textContent='Add a PDF to start.';renderScore();return;}
@@ -53,12 +55,61 @@ $('manual').onclick=()=>{if(state.model)planRows();};
 $('download').onclick=()=>task(async()=>{const plan=Object.entries(state.plan).map(([id,text])=>({id,text}));const bytes=await ResumePDF.apply(state.model,plan);const fileName=($('job-name').value.trim()||'tailored')+'-'+(state.library.find(r=>r.id===state.selected)?.name||'resume');const safe=fileName.normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,150)||'tailored-resume';const blob=new Blob([bytes],{type:'application/pdf'}),url=URL.createObjectURL(blob);let downloadId;
  try{if(isExtension){downloadId=await chrome.downloads.download({url,filename:safe+'.pdf',saveAs:false});const listener=delta=>{if(delta.id!==downloadId)return;if(delta.state?.current==='complete'){status('Tailored PDF saved to Downloads. Your master resume is unchanged.');chrome.downloads.onChanged.removeListener(listener);}else if(delta.error){status('Edge interrupted the download. Open Downloads to retry or save the file.',true);chrome.downloads.onChanged.removeListener(listener);}};chrome.downloads.onChanged.addListener(listener);setTimeout(()=>chrome.downloads.onChanged.removeListener(listener),180000);status('Download started. If Edge asks what to do, choose Save. Your master resume is unchanged.');const items=await chrome.downloads.search({id:downloadId});if(items[0]?.state==='complete'){status('Tailored PDF saved to Downloads. Your master resume is unchanged.');chrome.downloads.onChanged.removeListener(listener);}}else{const a=element('a');a.href=url;a.download=safe+'.pdf';document.body.append(a);a.click();a.remove();status('PDF download requested. Check your browser’s Downloads panel. Your master resume is unchanged.');}}finally{setTimeout(()=>URL.revokeObjectURL(url),60000);}
 });
+// Only workflow data is handed between views. API keys and PDF bytes are never
+// included in session drafts; both views share their existing private stores.
+function workflowSnapshot(){return {selected:state.selected,jobName:$('job-name').value,description:$('job-description').value,keywords:state.keywords,source:state.source,plan:$('review').hidden?null:state.plan,capture:state.capture};}
+function showCaptureSource(){const c=state.capture;$('captured-job').hidden=!c;$('captured-job').textContent=c?'Captured job: '+(c.title||'Untitled job')+'. Click S on another job to switch.':'';}
+function applyCapture(capture){
+ if(!capture||capture.id&&capture.id===state.capture?.id)return;
+ if(state.busy){state.revision++;state.pendingCapture=capture;return;}
+ state.capture=capture;invalidateKeywords();$('job-name').value=capture.title||'';$('job-description').value=capture.description||'';
+ $('capture-info').textContent=capture.simplify?.keywords?.length?`Captured ${capture.simplify.keywords.length} visible Simplify keywords. Use the import button or compare with Luna.`:capture.error||'Job text captured where available. Open Simplify’s Resume Score panel and choose Refresh job to import its visible keywords.';
+ $('use-simplify').disabled=!capture.simplify?.keywords?.length;showCaptureSource();renderScore();scheduleDraft();
+}
+async function restoreWorkflow(draft){
+ if(!draft||typeof draft.description!=='string')return;
+ state.library=await allResumes();libraryOptions();
+ if(draft.selected&&state.library.some(r=>r.id===draft.selected)&&draft.selected!==state.selected)await selectResume(draft.selected);
+ state.capture=draft.capture||null;$('job-name').value=draft.jobName||'';$('job-description').value=draft.description;
+ setKeywords((draft.keywords||[]).map(k=>({...k})),draft.source||'');
+ if(draft.plan&&state.model){const proposals=Object.entries(draft.plan).filter(([id])=>state.model.slots.some(s=>s.id===id)).map(([slotId,replacement])=>({slotId,replacement}));planRows(proposals);}
+ $('use-simplify').disabled=!state.capture?.simplify?.keywords?.length;
+ $('capture-info').textContent=state.capture?.simplify?.keywords?.length?`Captured ${state.capture.simplify.keywords.length} visible Simplify keywords. Use the import button or compare with Luna.`:'Your workflow is shared with the other view. Click S on a job to capture fresh text and visible Simplify keywords.';
+ showCaptureSource();renderScore();
+}
+let draftTimer;
+function scheduleDraft(){if(!isExtension||!isSidebar||!state.ready)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>chrome.storage.session.set({['sidebar_draft_'+state.windowId]:workflowSnapshot()}).catch(()=>{}),180);}
+for(const event of ['input','change','click'])document.addEventListener(event,e=>{if(e.target.id!=='api-key')scheduleDraft();});
+$('open-full-page').onclick=()=>task(async()=>{const id=crypto.randomUUID();await chrome.storage.session.set({['handoff_'+id]:workflowSnapshot()});await chrome.tabs.create({url:chrome.runtime.getURL('app.html')+'?handoff='+id});});
+$('open-sidebar').onclick=()=>{
+ if(state.busy||state.windowId===null)return;
+ // Invoke before asynchronous storage work to retain the button's user gesture.
+ chrome.sidePanel.open({windowId:state.windowId}).then(()=>chrome.storage.session.set({['sidebar_handoff_'+state.windowId]:{id:crypto.randomUUID(),draft:workflowSnapshot()}})).catch(e=>status(e.message,true));
+};
+$('refresh-job').onclick=()=>task(async()=>{const result=await chrome.runtime.sendMessage({action:'REFRESH_JOB',windowId:state.windowId});if(result?.error)throw new Error(result.error);if(result?.capture){state.pendingCapture=result.capture;status('Job captured. Updating the review…');}});
 async function start(){
  setBusy(true);try{
   state.library=await allResumes();
   libraryOptions();await selectResume((await store.get('selected-resume'))||state.library[0]?.id||null);
-  const captureId=new URLSearchParams(location.search).get('capture');if(isExtension&&captureId){state.capture=(await chrome.storage.session.get('capture_'+captureId))['capture_'+captureId];if(state.capture){$('job-name').value=state.capture.title||'';$('job-description').value=state.capture.description||'';$('capture-info').textContent=state.capture.simplify?.keywords?.length?`Captured ${state.capture.simplify.keywords.length} visible Simplify keywords. Use the import button or compare with Luna.`:state.capture.error||'Job text captured where available. Open Simplify’s Resume Score tab before clicking the toolbar icon to import its keywords.';$('use-simplify').disabled=!state.capture.simplify?.keywords?.length;renderScore();}}
+  if(isExtension){
+   state.windowId=(await chrome.windows.getCurrent()).id;
+   $('open-full-page').hidden=!isSidebar;$('open-sidebar').hidden=isSidebar||!chrome.sidePanel?.open;$('refresh-job').hidden=!isSidebar;
+   chrome.storage.onChanged.addListener((changes,area)=>{
+    if(area!=='session'||!isSidebar)return;
+    const capture=changes['sidebar_capture_'+state.windowId]?.newValue;
+    if(capture)applyCapture(capture);
+    const handoff=changes['sidebar_handoff_'+state.windowId]?.newValue;
+    if(handoff){if(state.busy){state.revision++;state.pendingWorkflow=handoff.draft;}else restoreWorkflow(handoff.draft).catch(e=>status(e.message,true));}
+   });
+   const captureId=viewParams.get('capture'),handoffId=viewParams.get('handoff');
+   const keys=['sidebar_draft_'+state.windowId,'sidebar_capture_'+state.windowId,'sidebar_handoff_'+state.windowId];if(captureId)keys.push('capture_'+captureId);if(handoffId)keys.push('handoff_'+handoffId);
+   const saved=await chrome.storage.session.get(keys);
+   const draft=handoffId?saved['handoff_'+handoffId]:isSidebar?(saved['sidebar_handoff_'+state.windowId]?.draft||saved['sidebar_draft_'+state.windowId]):null;
+   if(draft)await restoreWorkflow(draft);
+   const latest=captureId?saved['capture_'+captureId]:isSidebar?saved['sidebar_capture_'+state.windowId]:null;
+   if(latest&&latest.id!==state.capture?.id)state.pendingCapture=latest;
+  }
   if(await store.get('api-key'))$('api-key').placeholder='Key saved on this device';
- }catch(e){status(e.message,true);}finally{setBusy(false);}
+ }catch(e){status(e.message,true);}finally{state.ready=true;setBusy(false);}
 }
 start();

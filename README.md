@@ -17,7 +17,7 @@ A Microsoft Edge / Chromium extension that tailors only the Skills section of a 
 1. Download this repository and extract it, or clone it.
 2. Open `edge://extensions` (or `chrome://extensions`). Enable **Developer mode**.
 3. Choose **Load unpacked** and select the repository folder containing `manifest.json`.
-4. Open **Skills Tailor** from the Extensions menu and pin it if desired.
+4. Open **Skills Tailor** from the Extensions menu and pin it if desired. The toolbar opens a sidebar beside the job page.
 5. Add your own PDF resume. No personal resumes or API keys are included.
 6. Open **Settings** and save your OpenAI API key. The inference model is `gpt-6-luna`.
 
@@ -29,7 +29,15 @@ Select a resume → paste the job description → **Find keywords with Luna** �
 
 **Edit replacements manually** works without an API request once keywords are imported. Every copy starts from the immutable master. The extension never submits a job application.
 
-To import Simplify keywords, open its **Resume Score** panel on a job page and click the Skills Tailor toolbar icon. In the new tab choose **Use Simplify keywords**. This reads visible DOM only; it does not access Simplify's credentials, private APIs, network traffic, or extension storage. The integration may break when Simplify's UI changes. Paste comma-separated or line-separated keywords as a fallback. Cross-origin embedded job descriptions may also need copy/paste.
+To import Simplify keywords, open its **Resume Score** panel on a job page and click the Skills Tailor toolbar icon. In the sidebar choose **Use Simplify keywords**. This reads visible DOM only; it does not access Simplify's credentials, private APIs, network traffic, or extension storage. The integration may break when Simplify's UI changes. Paste comma-separated or line-separated keywords as a fallback. Cross-origin embedded job descriptions may also need copy/paste.
+
+## Sidebar and full-page views
+
+The toolbar opens the sidebar while capturing the exact job tab you clicked from. Open Simplify’s **Resume Score** panel first; its visible chips still import through **Use Simplify keywords**. **Refresh job** rereads the active job and its currently visible chips. If the browser has not granted temporary access to a different job tab, click **S** on that tab instead.
+
+Use **Full page ↗** in the sidebar to open the original spacious view. Your selected resume, pasted description, reviewed keywords, and replacement draft travel with it. **Open sidebar** returns that workflow to the sidebar. Both views share the local resume library and API-key storage; no credentials or PDF bytes are copied into the handoff. Sidebar drafts persist in session storage while the browser session lasts. A captured-job label identifies which posting the displayed workflow belongs to; switching browser tabs alone never silently rewrites a draft or scans another site.
+
+Browsers without a working Side Panel API fall back to the full-page view. Existing full-page options remain available through the extension’s Details/Options page.
 
 ## PDF compatibility
 
@@ -57,7 +65,7 @@ The score is exact keyword coverage across the selected resume, including draft 
 - OpenAI's provider data policies still apply. No analytics or third-party backend is included.
 - Never commit API keys or personal resumes. `.env` files are ignored but are not read by the extension.
 
-Permissions: storage, downloads, activeTab, scripting, and OpenAI API host access. Job-page reading is temporary and begins when the toolbar icon is clicked; there is no background scanning.
+Permissions: sidePanel, storage, downloads, activeTab, scripting, and OpenAI API host access. Job-page reading is temporary and begins when the toolbar icon is clicked; there is no background scanning.
 
 Downloads follow browser preferences. To save automatically, turn off the browser's option to ask where to save each file; this affects other downloads too. The extension reports download completion or interruption.
 
@@ -68,6 +76,7 @@ Requires Node.js, with no package installation:
 ```sh
 node tests/engine.cjs
 node tests/ai.cjs
+node tests/sidebar.cjs
 ```
 
 The PDF tests generate a synthetic resume in memory using the licensed Bitstream Vera fixture. They check font/width limits, replacement validation, and preservation of untouched glyph positions. API tests use controlled responses to verify request structure, grounded evidence, filtering, and error handling; they do not make paid API requests. Tests on private user documents are not included.
