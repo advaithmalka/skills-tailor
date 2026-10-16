@@ -86,3 +86,6 @@ For a development-only preview, run `python3 -m http.server 8765 --bind 127.0.0.
 ## License
 
 Project code: MIT. Bundled dependencies and test fonts retain their own licenses/notices; see `THIRD_PARTY.md` and the files in `vendor/` and `tests/fixtures/`.
+
+
+Live Edge verification: sidebar capture and visible Simplify imports tested on T-Mobile and Duolingo; replacement drafts survive full-page round trips; tailored PDF download tested from the sidebar.
