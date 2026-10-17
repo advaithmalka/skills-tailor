@@ -10,5 +10,5 @@ body.sidebar{min-width:280px;font-size:12px}body.sidebar header{position:sticky;
 .line-budget{border:1px solid var(--border,#dce4e8);border-radius:10px;padding:12px;margin:10px 0;font-size:12px;display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between}
 .line-budget.overfull{border-color:#c34444;color:#a32e2e}
 .line-preview{width:100%;color:#576a73;overflow-wrap:anywhere;line-height:1.6}
-.sidebar .replace-row{grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) auto}
-@media(max-width:420px){.replace-row,.sidebar .replace-row{grid-template-columns:1fr auto}.replace-row .original{grid-column:1 / -1}.replace-row .fit{grid-column:1 / -1}}
+body.sidebar .replace-row{grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) auto}
+@media(max-width:420px){.replace-row,body.sidebar .replace-row{grid-template-columns:1fr auto}.replace-row .original{grid-column:1 / -1}.replace-row .fit{grid-column:1 / -1}}
