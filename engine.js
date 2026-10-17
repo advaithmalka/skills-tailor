@@ -109,51 +109,82 @@ async function inspect(bytes){
  if(doc.isEncrypted)fail('Password-protected PDFs are unsupported.');
  if(doc.getForm().getFields().some(f=>f.constructor.name==='PDFSignature'))fail('Signed PDFs cannot be edited without invalidating their signature.');
  if(doc.getPageCount()>8)fail('Please use a resume with at most 8 pages.');
- const pages=doc.getPages().map((p,i)=>readPage(doc,p,i)),slots=[],categories=[];let section=false,found=0;
+ const pages=doc.getPages().map((p,i)=>readPage(doc,p,i)),slots=[],categories=[],lines=[];let section=false,found=0;
  for(const pg of pages)for(const row of pg.rows){
   if(/^\s*(?:TECHNICAL\s+)?SKILLS\s*$/i.test(row.text)){section=true;found++;continue;}
   if(!section)continue;
   if(!row.text.trim())continue;
   const colon=row.text.indexOf(':');if(colon<0){section=false;continue;}
   const label=row.text.slice(0,colon).trim();if(!label||label.length>50)fail('Unsupported Skills category label.');
-  const content=row.chars.slice(colon+1);if(!content.some(c=>/[•·]/.test(c.text)))fail('Use a PDF with bullet-separated Skills categories; this layout cannot be safely edited yet.');
+  const content=row.chars.slice(colon+1),lineId='p'+pg.index+'r'+lines.length,firstSlot=slots.length;
   let chunk=[];const add=()=>{while(chunk.length&&/^\s+$/.test(chunk[0].text))chunk.shift();while(chunk.length&&/^\s+$/.test(chunk.at(-1).text))chunk.pop();if(!chunk.length)return;
    if(chunk.some(c=>!c.editable||c.text==='\uFFFD'))fail('The Skills text uses unsupported positioning, encoding, or fonts. Please export a fresh text-based PDF.');
    if(chunk.some(c=>c.size!==chunk[0].size||c.color!==chunk[0].color))fail('Mixed text styles inside a skill cannot be edited safely.');
-   const slot={id:'p'+pg.index+'s'+slots.length,page:pg.index,category:label,text:chunk.map(c=>c.text).join(''),chars:[...chunk],x:chunk[0].x,y:row.y,size:chunk[0].size,color:chunk[0].color,width:chunk.at(-1).x+chunk.at(-1).width-chunk[0].x};
+   const slot={id:'p'+pg.index+'s'+slots.length,page:pg.index,lineId,category:label,text:chunk.map(c=>c.text).join(''),chars:[...chunk],x:chunk[0].x,y:row.y,size:chunk[0].size,color:chunk[0].color,width:chunk.at(-1).x+chunk.at(-1).width-chunk[0].x};
    if(slot.text.length>90||slot.width<=0)fail('Could not safely identify individual Skills entries.');slots.push(slot);chunk=[];
   };
   for(const c of content){if(/[•·]/.test(c.text)){add();chunk=[];}else chunk.push(c);}add();categories.push({label,page:pg.index,y:row.y});
+  const entries=slots.slice(firstSlot);if(entries.length){
+   const first=entries[0],last=entries.at(-1);
+   const start=content.findIndex(c=>c.id===first.chars[0].id),end=content.findIndex(c=>c.id===last.chars.at(-1).id);
+   const chars=content.slice(start,end+1);
+   if(chars.some(c=>!c.editable))fail('The Skills line separators use unsupported positioning or fonts.');
+   const gaps=entries.slice(1).map((next,i)=>{const prev=entries[i],a=chars.findIndex(c=>c.id===prev.chars.at(-1).id)+1,b=chars.findIndex(c=>c.id===next.chars[0].id),x=prev.x+prev.width;return {width:next.x-x,chars:chars.slice(a,b),x};});
+   if(gaps.some(g=>g.width<0||!g.chars.some(c=>/[•·]/.test(c.text))))fail('Could not safely identify Skills separators.');
+   lines.push({id:lineId,page:pg.index,category:label,y:row.y,x:first.x,width:last.x+last.width-first.x,slots:entries,chars,gaps});
+  }
  }
  if(found!==1||!slots.length)fail('Could not identify one supported Skills section. Use a text PDF with category labels and bullet-separated skills.');
  if(slots.length>120)fail('Too many Skills entries.');
- return {doc,pages,slots,categories,bytes};
+ return {doc,pages,slots,categories,lines,bytes};
 }
-function summary(model){return model.slots.map(s=>({id:s.id,category:s.category,text:s.text,maxCharacters:[...s.text].length,maxWidth:Number(s.width.toFixed(2))}));}
+function summary(model){return model.slots.map(s=>({id:s.id,lineId:s.lineId,category:s.category,text:s.text,originalWidth:Number(s.width.toFixed(2)),separatorWidth:Number((model.lines.find(l=>l.id===s.lineId).gaps[0]?.width||0).toFixed(2)),maxWidth:Number(model.lines.find(l=>l.id===s.lineId).width.toFixed(2))}));}
 function replacement(model,id,text){
  const slot=model.slots.find(s=>s.id===id);if(!slot)return {ok:false,error:'Unknown skill slot.'};
  text=text.trim();if(text===slot.text)return {ok:true,unchanged:true,text,slot};
- if(!text)return {ok:false,error:'Choose a replacement, or keep the original skill.'};
+ if(!text)return {ok:true,deleted:true,text:'',width:0,slot};
  if(/[\r\n•·]/.test(text))return {ok:false,error:'Enter one skill without bullets or line breaks.'};
- if([...text].length>[...slot.text].length)return {ok:false,error:`${[...text].length} characters; maximum ${[...slot.text].length}.`};
+ if([...text].length>200)return {ok:false,error:'Keep each skill under 200 characters.'};
  const pg=model.pages[slot.page],candidates=[...pg.fonts.values()].filter(f=>f.glyphFont&&f.base.replace(/^[A-Z]{6}\+/,'')===pg.fonts.get(slot.chars[0].font)?.base.replace(/^[A-Z]{6}\+/,''));
  const missing=new Set();
  for(const font of candidates){let codes=[],width=0,valid=true;for(const ch of text){const code=font.reverse.get(ch);if(code===undefined||!font.glyphFont.hasGlyphForCodePoint(ch.codePointAt(0))){valid=false;missing.add(ch);break;}codes.push(code);width+=font.widths.get(code)/1000*slot.size;}
-  if(valid){if(width>slot.width+0.001)return {ok:false,error:`Too wide (${width.toFixed(1)} pt; maximum ${slot.width.toFixed(1)} pt). Use a shorter phrase.`};return {ok:true,text,slot,font,width,codes};}
+  if(valid){const line=model.lines.find(l=>l.id===slot.lineId);if(width>line.width+0.001)return {ok:false,error:`Too wide for the entire line (${width.toFixed(1)} / ${line.width.toFixed(1)} pt).`};return {ok:true,text,slot,font,width,codes};}
  }
  return {ok:false,error:missing.size?`Original font cannot print: ${[...missing].join(' ')}. Edit this skill; fonts are never substituted.`:'Original embedded font cannot safely encode a replacement.'};
 }
 function validatePlan(model,plan){
  if(!Array.isArray(plan))fail('Invalid change plan.');const seen=new Set(),out=[];
  for(const row of plan){if(seen.has(row.id))fail('Each existing skill can be replaced only once.');seen.add(row.id);const r=replacement(model,row.id,String(row.text??''));if(!r.ok)fail(r.error);if(!r.unchanged)out.push(r);}
- const final=model.slots.map(s=>out.find(r=>r.slot.id===s.id)?.text??s.text),normalized=final.map(s=>s.toLowerCase());
- if(new Set(normalized).size!==normalized.length)fail('The final Skills section contains duplicate skills. Choose another replacement.');return out;
+ const final=model.slots.map(s=>out.find(r=>r.slot.id===s.id)?.text??s.text),normalized=final.filter(Boolean).map(s=>s.toLowerCase());
+ if(new Set(normalized).size!==normalized.length)fail('The final Skills section contains duplicate skills. Choose another replacement.');layoutLines(model,out);return out;
 }
+// Compact only edited Skills lines; each keeps its original start, baseline,
+// fonts and right edge. Gaps reuse the original separator glyphs and spacing.
+function layoutLines(model,changes,enforce=true){
+ const byId=new Map(changes.map(r=>[r.slot.id,r])),out=[];
+ for(const line of model.lines){
+  if(!line.slots.some(s=>byId.has(s.id)))continue;
+  const items=[];let x=line.x;
+  for(const slot of line.slots){
+   const change=byId.get(slot.id);if(change?.deleted)continue;
+   if(items.length){const index=line.slots.indexOf(slot),gap=line.gaps[Math.max(0,index-1)];items.push({gap,x});x+=gap.width;}
+   const width=change?change.width:slot.width;
+   items.push({slot,change,x});x+=width;
+  }
+  const width=x-line.x;
+  if(enforce&&width>line.width+0.001)fail(`${line.category} line is ${(width-line.width).toFixed(1)} pt too wide (${width.toFixed(1)} / ${line.width.toFixed(1)} pt). Remove another skill on this line or shorten a skill.`);
+  out.push({line,items,width});
+ }
+ return out;
+}
+function measureLines(model,plan){const changes=plan.map(r=>replacement(model,r.id,String(r.text??''))).filter(r=>r.ok&&!r.unchanged);const rows=layoutLines(model,changes,false);return model.lines.map(line=>rows.find(r=>r.line.id===line.id)||{line,width:line.width,items:line.slots.map(slot=>({slot,x:slot.x}))});}
+function layout(model,plan){return layoutLines(model,validatePlan(model,plan));}
 async function apply(model,plan){
- const changes=validatePlan(model,plan);if(!changes.length)fail('Choose at least one skill replacement before downloading.');
+ const changes=validatePlan(model,plan);if(!changes.length)fail('Choose at least one skill change before downloading.');
+ const lines=layoutLines(model,changes);
  // Always reload the immutable master; tailored copies never become the source.
  const target=await P.PDFDocument.load(model.bytes,{updateMetadata:false});
- const removed=new Set(changes.flatMap(r=>r.slot.chars.map(c=>`${c.page}:${c.id}`)));
+ const removed=new Set(lines.flatMap(r=>r.line.chars.map(c=>`${c.page}:${c.id}`)));
  for(const pg of model.pages){const edits=[];
   for(const show of pg.shows){if(!show.chars.some(c=>removed.has(`${c.page}:${c.id}`)))continue;
    const parts=[];for(const part of show.parts){if(part.type==='num'){parts.push(fmt(part.value));continue;}
@@ -163,14 +194,17 @@ async function apply(model,plan){
    edits.push({start:show.start,end:show.end,value:'['+parts.join(' ')+'] TJ'});
   }
   let content=pg.source;for(const e of edits.sort((a,b)=>b.start-a.start))content=content.slice(0,e.start)+e.value+content.slice(e.end);
-  // Restore inherited graphics state before painting replacement runs.
-  let additions='\n';for(const r of changes.filter(r=>r.slot.page===pg.index)){
-   const b=[];for(const c of r.codes){if(r.font.type0)b.push(c>>8,c&255);else b.push(c);}
-   const s=r.slot;additions+=`q BT /${r.font.name} ${fmt(s.size)} Tf 0 Tc 0 Tw 100 Tz 0 Ts 0 Tr ${s.color} 1 0 0 1 ${fmt(s.x)} ${fmt(s.y)} Tm <${hex(Uint8Array.from(b))}> Tj ET Q\n`;
+  let additions='\n';
+  function paint(font,size,color,x,y,codes){const b=[];for(const c of codes){if(font.type0)b.push(c>>8,c&255);else b.push(c);}additions+=`q BT /${font.name} ${fmt(size)} Tf 0 Tc 0 Tw 100 Tz 0 Ts 0 Tr ${color} 1 0 0 1 ${fmt(x)} ${fmt(y)} Tm <${hex(Uint8Array.from(b))}> Tj ET Q\n`;}
+  function original(chars,dx){for(const c of chars)paint(pg.fonts.get(c.font),c.size,c.color,c.x+dx,c.y,[c.code]);}
+  for(const row of lines.filter(r=>r.line.page===pg.index))for(const item of row.items){
+   if(item.gap)original(item.gap.chars,item.x-item.gap.x);
+   else if(item.change){const r=item.change;paint(r.font,r.slot.size,r.slot.color,item.x,r.slot.y,r.codes);}
+   else original(item.slot.chars,item.x-item.slot.x);
   }
   const stream=target.context.flateStream(textToBytes('q\n'+content+'\nQ\n'+additions));target.getPage(pg.index).node.set(P.PDFName.of('Contents'),target.context.register(stream));
  }
  return target.save({useObjectStreams:false,addDefaultPage:false,updateFieldAppearances:false});
 }
-root.ResumePDF={inspect,summary,replacement,validatePlan,apply,lex};
+root.ResumePDF={inspect,summary,replacement,validatePlan,layout,measureLines,apply,lex};
 })(globalThis);
