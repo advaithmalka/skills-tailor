@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');require('../ai.js');
  const jd='We use Python and SQL to analyze data.';
  const keywords=await TailorAI.keywords('sk-test',jd,mock({keywords:[{term:'Python',evidence:'“Python”'},{term:'Madeup',evidence:'not in posting'}]}));
  assert.equal(keywords.length,1);assert.equal(keywords[0].term,'Python');
- const replacements=await TailorAI.suggest('sk-test',jd,[{id:'s1',text:'MATLAB',maxCharacters:6,maxWidth:30}],['Python'],mock({replacements:[{slotId:'s1',replacement:'Python',keyword:'Python',reason:'Required'},{slotId:'invented',replacement:'Python',keyword:'Python',reason:''},{slotId:'s1',replacement:'Fake',keyword:'Python',reason:''}]}));assert.equal(replacements.length,1);
+ const replacements=await TailorAI.suggest('sk-test',jd,[{id:'s1',text:'MATLAB',lineId:'l1',maxWidth:70},{id:'s2',text:'HTML',lineId:'l1',maxWidth:70}],['Python'],mock({replacements:[{slotId:'s1',replacement:'Python',keyword:'Python',reason:'Required'},{slotId:'invented',replacement:'Python',keyword:'Python',reason:''},{slotId:'s2',replacement:'',keyword:'',reason:'Free space'},{slotId:'s1',replacement:'Fake',keyword:'Python',reason:''}]}));assert.equal(replacements.length,2);assert(replacements.some(r=>r.replacement===''));
  await assert.rejects(()=>TailorAI.call('', '', {}, {},mock({})),/API key/);
  await assert.rejects(()=>TailorAI.keywords('sk-test',jd,async()=>({ok:false,status:401,json:async()=>({})})),/key was rejected/);
  await assert.rejects(()=>TailorAI.keywords('sk-test',jd,async()=>({ok:true,json:async()=>({status:'incomplete'})})),/incomplete/);

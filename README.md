@@ -8,7 +8,7 @@ A Microsoft Edge / Chromium extension that tailors only the Skills section of a 
 - Paste a job description or capture supported pages with the toolbar action.
 - Extract grounded keywords with GPT-6 Luna; review, add, and drop keywords before editing.
 - Import Simplify's currently visible keyword chips, with a paste fallback.
-- Review individual skill replacements with deterministic character-count, printed-width, and font-glyph checks.
+- Review individual skill replacements with shared line-width budgets and font-glyph checks.
 - Download the modified original PDF without regenerating its template.
 - Show keyword coverage with a score ring and matched/missing chips.
 
@@ -48,7 +48,7 @@ This is a constrained PDF editor, not an arbitrary PDF rewriting tool. Import cu
 - Supported embedded fonts/encodings and simple horizontal text positioning.
 - A text-based, unencrypted, unsigned PDF; maximum 15 MB and 8 pages.
 
-The editor changes selected text-show operations, retaining original font resources, size, color, baseline, labels, separators, and unrelated content. A replacement cannot exceed the original skill's character count or printed width. Missing embedded-font glyphs are blocked rather than silently substituted. Shorter replacements can leave extra space before existing bullets; the document never reflows.
+The editor changes only edited Skills lines, retaining original font resources, size, color, baseline, category labels, and unrelated content. Each line shares its original printed-width budget. Choose Remove (or clear a box) to delete a skill and free room for longer wording on that same line. The remaining skills and original bullet style compact together without line wrapping; no line may extend past its original right edge. Missing embedded-font glyphs are blocked rather than silently substituted. Restore reverses a removal.
 
 Scanned PDFs, unusual encodings/positioning, inline images, and some other layouts may be rejected. Adding a PDF runs compatibility checks before saving it.
 
@@ -89,3 +89,8 @@ Project code: MIT. Bundled dependencies and test fonts retain their own licenses
 
 
 Live Edge verification: sidebar capture and visible Simplify imports tested on T-Mobile and Duolingo; replacement drafts survive full-page round trips; tailored PDF download tested from the sidebar.
+
+
+### Shared line space (v1.2)
+
+Skills can be removed with Remove or an empty box and restored with Restore. Longer replacements share space with the other skills on the same original line; the preview shows used / available points and blocks overflow. Luna can propose removals to make room for approved keywords. Each downloaded copy starts from the original PDF.

@@ -138,7 +138,7 @@ async function inspect(bytes){
  if(slots.length>120)fail('Too many Skills entries.');
  return {doc,pages,slots,categories,lines,bytes};
 }
-function summary(model){return model.slots.map(s=>({id:s.id,lineId:s.lineId,category:s.category,text:s.text,originalWidth:Number(s.width.toFixed(2)),separatorWidth:Number((model.lines.find(l=>l.id===s.lineId).gaps[0]?.width||0).toFixed(2)),maxWidth:Number(model.lines.find(l=>l.id===s.lineId).width.toFixed(2))}));}
+function summary(model){return model.slots.map(s=>({id:s.id,lineId:s.lineId,category:s.category,text:s.text,originalWidth:Number(s.width.toFixed(2)),separatorWidthBefore:Number((model.lines.find(l=>l.id===s.lineId).gaps[model.lines.find(l=>l.id===s.lineId).slots.indexOf(s)-1]?.width||0).toFixed(2)),maxWidth:Number(model.lines.find(l=>l.id===s.lineId).width.toFixed(2))}));}
 function replacement(model,id,text){
  const slot=model.slots.find(s=>s.id===id);if(!slot)return {ok:false,error:'Unknown skill slot.'};
  text=text.trim();if(text===slot.text)return {ok:true,unchanged:true,text,slot};
