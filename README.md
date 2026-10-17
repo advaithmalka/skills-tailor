@@ -77,6 +77,7 @@ Requires Node.js, with no package installation:
 node tests/engine.cjs
 node tests/ai.cjs
 node tests/suggestions.cjs
+node tests/score.cjs
 node tests/sidebar.cjs
 ```
 
@@ -100,3 +101,10 @@ Skills can be removed with Remove or an empty box and restored with Restore. Lon
 ### Duplicate-free suggestions (v1.2.1)
 
 Suggestions are checked against the entire final Skills section before display, including unchanged originals. Repeated terms (ignoring case, Unicode presentation variants, and extra spaces) are resolved locally without another API call. Redundant proposals keep their original skill when possible; a duplicate whose original is already used elsewhere becomes an explicit removal for review. Repeated slot IDs are ignored. Manual edits still receive the same duplicate guard before download.
+
+
+### Coverage-focused planning and comparison (v1.3)
+
+Luna aims for 85% of the approved keywords, reaching toward 90% when the original line space and fonts allow. It can replace or remove more low-relevance skills, while retaining existing approved matches. Width and duplicate checks remain mandatory.
+
+The score card shows immutable **Before** and live **After draft** keyword coverage. When Simplify is captured, a separate comparison always uses all captured Simplify keywords against the selected PDF, regardless of the keywords chosen for Luna. Simplify’s reported weighted score is shown as a captured baseline; an updated official score requires uploading the tailored PDF to Simplify. The local after percentage is never labeled as Simplify’s weighted score.

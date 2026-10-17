@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');require('../score.js');
+const chars=[...'Skills: Python • React'].map((text,id)=>({text,id,page:0}));
+const model={pages:[{rows:[{chars},{chars:[...'Experience: SQL'].map((text,i)=>({text,id:100+i,page:0}))}]}],slots:[{id:'react',text:'React',chars:chars.slice(-5)}]};
+const original=JSON.stringify(model),terms=['Python','SQL','Go','Docker'];
+const comparison=ResumeScore.compare(model,{react:'Go'},terms);
+assert.deepEqual(comparison.before,{matched:2,total:4,percent:50});assert.deepEqual(comparison.after,{matched:3,total:4,percent:75});
+assert.equal(JSON.stringify(model),original,'scoring never changes the master');
+assert.equal(ResumeScore.compare(model,{react:''},['React']).after.percent,0);
+assert.equal(ResumeScore.compare(model,{},['React']).after.percent,100);
+assert.deepEqual(ResumeScore.coverage('Python',['Python',' python ','Ｐｙｔｈｏｎ']),{matched:1,total:1,percent:100});
+assert.equal(ResumeScore.coverage('',[]).percent,null);
+assert(!ResumeScore.contains('JavaScript C++ PyTorch','Java'));assert(!ResumeScore.contains('JavaScript C++ PyTorch','C'));assert(!ResumeScore.contains('JavaScript C++ PyTorch','Python'));
+assert(ResumeScore.contains('C++, SQL; REST APIs','C++'));
+console.log('PASS immutable before/after coverage, removals, restores, deduplication, empty terms and keyword boundaries');

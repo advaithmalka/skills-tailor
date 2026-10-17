@@ -12,3 +12,5 @@ body.sidebar{min-width:280px;font-size:12px}body.sidebar header{position:sticky;
 .line-preview{width:100%;color:#576a73;overflow-wrap:anywhere;line-height:1.6}
 body.sidebar .replace-row{grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) auto}
 @media(max-width:420px){.replace-row,body.sidebar .replace-row{grid-template-columns:1fr auto}.replace-row .original{grid-column:1 / -1}.replace-row .fit{grid-column:1 / -1}}
+
+#coverage-comparison{margin:0 0 18px}.comparison-title{font-size:12px;font-weight:650;display:block;margin:10px 0}.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.comparison-cell{background:#f2f8fa;border:1px solid #e0ebef;border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:5px}.comparison-cell>span{font-size:11px;color:#657982}.comparison-cell strong{font-size:22px;color:#147c8e}.comparison-cell small{font-size:10px;color:#647a85}.comparison-delta{font-size:11px;color:#147c8e;margin-top:8px}.reported-score{font-size:12px!important;color:#415962!important}
