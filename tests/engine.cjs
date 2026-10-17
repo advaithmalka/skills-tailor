@@ -2,7 +2,7 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 global.PDFLib=require('../vendor/pdf-lib.min.js');
 global.fontkit=require('../vendor/fontkit.umd.min.js');
-require('../engine.js');
+require('../engine.js');require('../ai.js');
 (async()=>{
  const doc=await PDFLib.PDFDocument.create();doc.registerFontkit(fontkit);
  const font=await doc.embedFont(fs.readFileSync(__dirname+'/fixtures/Vera.ttf'),{subset:false});
@@ -19,6 +19,11 @@ require('../engine.js');
  assert.equal(model.slots.length,29);
  const variant='synthetic';
  const slot=t=>model.slots.find(s=>s.text===t).id;
+ const suggestions=await TailorAI.suggest('sk-test','SQL and Go',ResumePDF.summary(model),['SQL','Go'],async()=>({ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({replacements:[{slotId:slot('React'),replacement:'SQL'},{slotId:slot('Kubernetes'),replacement:'Go'},{slotId:slot('Flask'),replacement:'Go'}]})}]}]})}));
+ const checked=ResumePDF.validatePlan(model,suggestions.map(r=>({id:r.slotId,text:r.replacement})));
+ assert.equal(checked.length,1,'actual PDF suggestion flow drops existing and newly repeated skills before review');
+ assert.equal(checked[0].text,'Go');
+
  const plan=pairs=>pairs.map(([a,text])=>({id:slot(a),text}));
  const check=(a,b)=>ResumePDF.replacement(model,slot(a),b);
  assert.equal(check('Python','').ok,true,'blank deletes');
@@ -27,6 +32,7 @@ require('../engine.js');
  assert.equal(check('Kubernetes','🧪').ok,false,'font coverage enforced');
  assert.throws(()=>ResumePDF.validatePlan(model,plan([['Java','Bash'],['Java','Go']])),/only once/);
  assert.throws(()=>ResumePDF.validatePlan(model,plan([['JavaScript','Python']])),/duplicate/);
+ assert.throws(()=>ResumePDF.validatePlan(model,plan([['JavaScript','Computer  Vision']])),/duplicate/,'spacing variants across lines are duplicates');
  await assert.rejects(()=>ResumePDF.apply(model,[]),/at least one/);
  const long=plan([['Python','data structures']]);
  assert.throws(()=>ResumePDF.validatePlan(model,long),/line.*too wide/,'long skill cannot overflow');

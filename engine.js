@@ -155,7 +155,7 @@ function replacement(model,id,text){
 function validatePlan(model,plan){
  if(!Array.isArray(plan))fail('Invalid change plan.');const seen=new Set(),out=[];
  for(const row of plan){if(seen.has(row.id))fail('Each existing skill can be replaced only once.');seen.add(row.id);const r=replacement(model,row.id,String(row.text??''));if(!r.ok)fail(r.error);if(!r.unchanged)out.push(r);}
- const final=model.slots.map(s=>out.find(r=>r.slot.id===s.id)?.text??s.text),normalized=final.filter(Boolean).map(s=>s.toLowerCase());
+ const final=model.slots.map(s=>out.find(r=>r.slot.id===s.id)?.text??s.text),normalized=final.filter(Boolean).map(s=>s.normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase());
  if(new Set(normalized).size!==normalized.length)fail('The final Skills section contains duplicate skills. Choose another replacement.');layoutLines(model,out);return out;
 }
 // Compact only edited Skills lines; each keeps its original start, baseline,

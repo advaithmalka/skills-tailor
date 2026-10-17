@@ -76,6 +76,7 @@ Requires Node.js, with no package installation:
 ```sh
 node tests/engine.cjs
 node tests/ai.cjs
+node tests/suggestions.cjs
 node tests/sidebar.cjs
 ```
 
@@ -94,3 +95,8 @@ Live Edge verification: sidebar capture and visible Simplify imports tested on T
 ### Shared line space (v1.2)
 
 Skills can be removed with Remove or an empty box and restored with Restore. Longer replacements share space with the other skills on the same original line; the preview shows used / available points and blocks overflow. Luna can propose removals to make room for approved keywords. Each downloaded copy starts from the original PDF.
+
+
+### Duplicate-free suggestions (v1.2.1)
+
+Suggestions are checked against the entire final Skills section before display, including unchanged originals. Repeated terms (ignoring case, Unicode presentation variants, and extra spaces) are resolved locally without another API call. Redundant proposals keep their original skill when possible; a duplicate whose original is already used elsewhere becomes an explicit removal for review. Repeated slot IDs are ignored. Manual edits still receive the same duplicate guard before download.
