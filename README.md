@@ -78,6 +78,7 @@ node tests/engine.cjs
 node tests/ai.cjs
 node tests/suggestions.cjs
 node tests/score.cjs
+node tests/one-click.cjs
 node tests/sidebar.cjs
 ```
 
@@ -108,3 +109,8 @@ Suggestions are checked against the entire final Skills section before display, 
 Luna aims for 85% of the approved keywords, reaching toward 90% when the original line space and fonts allow. It can replace or remove more low-relevance skills, while retaining existing approved matches. Width and duplicate checks remain mandatory.
 
 The score card shows immutable **Before** and live **After draft** keyword coverage. When Simplify is captured, a separate comparison always uses all captured Simplify keywords against the selected PDF, regardless of the keywords chosen for Luna. Simplify’s reported weighted score is shown as a captured baseline; an updated official score requires uploading the tailored PDF to Simplify. The local after percentage is never labeled as Simplify’s weighted score.
+
+
+### One-click Simplify planning (v1.3.1)
+
+Choose **Simplify + Luna** to import all captured Simplify keywords and immediately ask Luna for a replacement draft. This uses one planning request and skips Luna keyword extraction. Review the additions/removals, then download. The shortcut is available when a resume and captured Simplify keywords are present; it never downloads automatically. **Use Simplify keywords** and the separate planning button remain available for editing the keyword list first.
