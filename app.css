@@ -14,3 +14,5 @@ body.sidebar .replace-row{grid-template-columns:minmax(90px,1fr) minmax(90px,1fr
 @media(max-width:420px){.replace-row,body.sidebar .replace-row{grid-template-columns:1fr auto}.replace-row .original{grid-column:1 / -1}.replace-row .fit{grid-column:1 / -1}}
 
 #coverage-comparison{margin:0 0 18px}.comparison-title{font-size:12px;font-weight:650;display:block;margin:10px 0}.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.comparison-cell{background:#f2f8fa;border:1px solid #e0ebef;border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:5px}.comparison-cell>span{font-size:11px;color:#657982}.comparison-cell strong{font-size:22px;color:#147c8e}.comparison-cell small{font-size:10px;color:#647a85}.comparison-delta{font-size:11px;color:#147c8e;margin-top:8px}.reported-score{font-size:12px!important;color:#415962!important}
+
+.action-status{border:1px solid #c0dce3;background:#eaf7fa;color:#215361;padding:12px;border-radius:9px;margin-top:12px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}.action-status.error{border-color:#ecc4be;background:#fff3f0;color:#8b362b}

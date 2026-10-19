@@ -79,6 +79,7 @@ node tests/ai.cjs
 node tests/suggestions.cjs
 node tests/score.cjs
 node tests/one-click.cjs
+node tests/incomplete.cjs
 node tests/sidebar.cjs
 ```
 
@@ -114,3 +115,8 @@ The score card shows immutable **Before** and live **After draft** keyword cover
 ### One-click Simplify planning (v1.3.1)
 
 Choose **Simplify + Luna** to import all captured Simplify keywords and immediately ask Luna for a replacement draft. This uses one planning request and skips Luna keyword extraction. Review the additions/removals, then download. The shortcut is available when a resume and captured Simplify keywords are present; it never downloads automatically. **Use Simplify keywords** and the separate planning button remain available for editing the keyword list first.
+
+
+### Visible request errors and incomplete-response recovery (v1.3.2)
+
+Luna errors/progress appear immediately below the action buttons that started the request, and errors scroll into view. The app uses low reasoning effort and reserves response space for both reasoning and the structured result (6,000 tokens for keyword extraction; 12,000 for planning). If OpenAI explicitly reports `max_output_tokens`, one retry doubles that limit; other incomplete reasons are not retried or mislabeled as long job descriptions. The overall 90-second timeout still applies. Evidence/replacement explanations remain concise. A detected application-start screen prompts for the actual posting before keyword extraction; Simplify-based planning remains available.
