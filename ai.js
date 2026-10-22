@@ -41,8 +41,32 @@ async function suggest(key,jd,skills,terms,fetcher,options={}){
  if(overflowRows.length){
   options.onProgress?.('Some Skills rows are too wide. Luna is removing lower-priority skills from those rows…');
   proposals=normalizeSuggestions(await call(key,instructions+' Repair the previous plan using the measured overflowRows. Return the COMPLETE revised replacement list, including unchanged proposals from the previous plan. Remove enough lower-priority skills on each overfull lineId to eliminate its excessWidth. Preserve fitting rows. Never remove skills on another row to make room. Do not add longer terms during this repair.',{...input,previousReplacements:proposals,overflowRows},planSchema,fetcher,{...options,maxOutputTokens:12000}),skills,terms);
+  // A second model answer can still overflow. Prune only the measured rows,
+  // checking exact PDF widths after every removal rather than trusting the model.
+  const repaired=fitOverflow(proposals,skills,terms,options.coveredKeywords||[],options.measureOverflow);
+  proposals=repaired.proposals;
+  options.onRepair?.({retried:true,removedSkills:repaired.removedSkills});
  }
  return proposals;
+}
+function fitOverflow(proposals,skills,terms,coveredKeywords,measureOverflow){
+ const normalize=s=>s.normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
+ const priority=new Map(terms.map((t,i)=>[normalize(t),i])),covered=new Set(coveredKeywords.map(normalize));
+ const changes=new Map(proposals.map(p=>[p.slotId,p]));
+ let removedSkills=0;
+ for(let remaining=skills.length;remaining>=0;remaining--){
+  const current=[...changes.values()],rows=measureOverflow(current);
+  if(!rows.length)return {proposals:current,removedSkills};
+  const row=rows[0];
+  const candidates=row.skills.filter(s=>s.text.trim()).map(s=>{
+   const key=normalize(s.text),slot=skills.find(original=>original.id===s.slotId);
+   return {...s,key,slot,tier:!priority.has(key)?0:covered.has(key)?1:2};
+  }).filter(s=>s.slot&&s.slot.lineId===row.lineId).sort((a,b)=>a.tier-b.tier||(priority.get(b.key)??0)-(priority.get(a.key)??0));
+  if(!remaining||!candidates.length)throw new Error('Could not fit the suggested Skills rows. No new draft was applied.');
+  const remove=candidates[0];
+  changes.set(remove.slotId,{slotId:remove.slotId,replacement:'',keyword:'',reason:'Removed a lower-priority skill so this row fits its original width.'});
+  removedSkills++;
+ }
 }
 function normalizeSuggestions(result,skills,terms){
  if(!Array.isArray(result.replacements))throw new Error('Missing replacement list.');
