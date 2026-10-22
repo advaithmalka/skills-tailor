@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+global.PDFLib=require('../vendor/pdf-lib.min.js');global.fontkit=require('../vendor/fontkit.umd.min.js');
+require('../engine.js');require('../ai.js');
+(async()=>{
+ const doc=await PDFLib.PDFDocument.create();doc.registerFontkit(fontkit);
+ const font=await doc.embedFont(fs.readFileSync(__dirname+'/fixtures/Vera.ttf'),{subset:false}),page=doc.addPage([700,800]);
+ page.drawText('SKILLS',{x:40,y:170,size:12,font});
+ page.drawText('Languages: Python • JavaScript • SQL • MATLAB',{x:40,y:145,size:10,font});
+ page.drawText('Tools: Docker • Git',{x:40,y:120,size:10,font});
+ const model=await ResumePDF.inspect(await doc.save()),slot=t=>model.slots.find(s=>s.text===t);
+ const row=(text,replacement)=>({slotId:slot(text).id,replacement,keyword:replacement,reason:'Relevant'});
+ const tooWide=[row('Python','data structures')],fixed=[...tooWide,row('JavaScript','')];
+ const plan=proposals=>proposals.map(r=>({id:r.slotId,text:r.replacement}));
+ assert.throws(()=>ResumePDF.validatePlan(model,plan(tooWide)),/too wide/);
+ const measureOverflow=proposals=>ResumePDF.measureLines(model,plan(proposals)).filter(r=>r.width>r.line.width+0.001).map(r=>({lineId:r.line.id,category:r.line.category,usedWidth:r.width,maxWidth:r.line.width,excessWidth:r.width-r.line.width,skills:r.items.filter(i=>i.slot).map(i=>({slotId:i.slot.id,text:i.change?.text??i.slot.text}))}));
+ const requests=[],progress=[];
+ const fetcher=async(url,opts)=>{requests.push(JSON.parse(opts.body));return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({replacements:requests.length===1?tooWide:fixed})}]}]})};};
+ const result=await TailorAI.suggest('sk-test','data structures',ResumePDF.summary(model),['data structures'],fetcher,{measureOverflow,onProgress:m=>progress.push(m),coveredKeywords:['end-to-end'],projectEvidence:['Built and deployed a complete service.']});
+ assert.equal(requests.length,2,'overfull row triggers one repair request');
+ assert.deepEqual(JSON.parse(requests[0].input).coveredKeywords,['end-to-end']);assert.deepEqual(JSON.parse(requests[0].input).projectEvidence,['Built and deployed a complete service.']);assert.match(requests[0].instructions,/need not be explicitly listed/);
+ const repair=JSON.parse(requests[1].input);assert.equal(repair.overflowRows.length,1);assert.equal(repair.overflowRows[0].lineId,slot('Python').lineId);assert(repair.overflowRows[0].excessWidth>0);assert(repair.overflowRows[0].skills.some(s=>s.text==='data structures'));assert.deepEqual(repair.previousReplacements,tooWide);
+ assert.equal(progress.length,1);ResumePDF.validatePlan(model,plan(result));
+ let calls=0;const alwaysWide=async()=>{calls++;return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({replacements:tooWide})}]}]})};};
+ await TailorAI.suggest('sk-test','data structures',ResumePDF.summary(model),['data structures'],alwaysWide,{measureOverflow});assert.equal(calls,2,'repair stops after one retry even if it still overflows');
+ requests.length=0;await TailorAI.suggest('sk-test','data structures',ResumePDF.summary(model),['data structures'],async(url,opts)=>{requests.push(JSON.parse(opts.body));return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({replacements:fixed})}]}]})};},{measureOverflow});assert.equal(requests.length,1,'fitting plan does not retry');
+ console.log('PASS exact PDF overflow feedback, one repair retry, same-row removals and fitting-plan single request');
+})().catch(e=>{console.error(e);process.exit(1)});

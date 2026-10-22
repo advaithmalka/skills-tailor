@@ -61,7 +61,7 @@ The score is exact keyword coverage across the selected resume, including draft 
 - Resumes are stored locally in extension-specific IndexedDB.
 - The API key is stored in extension-local browser storage. It persists across browser/computer restarts, but local storage is not a password vault. **Forget key** removes it; uninstalling clears extension data.
 - API requests go directly to `https://api.openai.com/v1/responses` with `store:false`.
-- Keyword extraction sends job text. Planning sends job text, selected keywords, and Skills-slot limits. The app does not upload the full PDF, contact details, education, or work history.
+- Keyword extraction sends job text. Planning sends job text, selected keywords, Skills-slot limits, and text under recognized Projects headings. Keywords already present anywhere in the resume are identified locally and sent as keyword names, so they need not be repeated in Skills. Project descriptions can support methods such as end-to-end development without requiring that wording in the original Skills list. The app does not upload the full PDF. Project-section text is sent as written.
 - OpenAI's provider data policies still apply. No analytics or third-party backend is included.
 - Never commit API keys or personal resumes. `.env` files are ignored but are not read by the extension.
 
@@ -80,6 +80,7 @@ node tests/suggestions.cjs
 node tests/score.cjs
 node tests/one-click.cjs
 node tests/incomplete.cjs
+node tests/overflow.cjs
 node tests/sidebar.cjs
 ```
 
@@ -120,3 +121,5 @@ Choose **Simplify + Luna** to import all captured Simplify keywords and immediat
 ### Visible request errors and incomplete-response recovery (v1.3.2)
 
 Luna errors/progress appear immediately below the action buttons that started the request, and errors scroll into view. The app uses low reasoning effort and reserves response space for both reasoning and the structured result (6,000 tokens for keyword extraction; 12,000 for planning). If OpenAI explicitly reports `max_output_tokens`, one retry doubles that limit; other incomplete reasons are not retried or mislabeled as long job descriptions. The overall 90-second timeout still applies. Evidence/replacement explanations remain concise. A detected application-start screen prompts for the actual posting before keyword extraction; Simplify-based planning remains available.
+
+After filtering suggestions and resolving duplicates, the app measures each final Skills row using the PDF’s exact widths. If any row overflows, Luna gets one automatic repair request with the previous plan, the overfull row IDs, their current skills, and the excess width to remove. Fitting rows should be preserved. If the repair still overflows, the draft remains editable and download stays blocked until it fits. This layout repair is separate from the response-token-limit retry. Project evidence informs planning; the displayed coverage score remains an exact keyword match.

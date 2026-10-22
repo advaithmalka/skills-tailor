@@ -12,3 +12,12 @@ assert.equal(ResumeScore.coverage('',[]).percent,null);
 assert(!ResumeScore.contains('JavaScript C++ PyTorch','Java'));assert(!ResumeScore.contains('JavaScript C++ PyTorch','C'));assert(!ResumeScore.contains('JavaScript C++ PyTorch','Python'));
 assert(ResumeScore.contains('C++, SQL; REST APIs','C++'));
 console.log('PASS immutable before/after coverage, removals, restores, deduplication, empty terms and keyword boundaries');
+
+const contextModel={slots:[],pages:[{rows:['Example Candidate','example@example.com','SUMMARY','Uses SQL for analysis','PROJECTS','Built a service from design through deployment.','Delivered an end-to-end pipeline.','EDUCATION','Example University','SKILLS','Languages: Python'].map(text=>({text,chars:[...text].map(text=>({text}))}))}]};
+const skillChars=contextModel.pages[0].rows.at(-1).chars;skillChars.forEach((c,id)=>Object.assign(c,{id,page:0}));
+contextModel.slots=[{id:'python',text:'Python',chars:skillChars.slice(-6)}];
+const context=ResumeScore.planningContext(contextModel,['SQL','end-to-end','Python','Docker']);
+assert.deepEqual(context.coveredKeywords,['SQL','end-to-end']);
+assert.deepEqual(context.projectEvidence,['Built a service from design through deployment.','Delivered an end-to-end pipeline.']);
+assert.deepEqual(ResumeScore.planningContext(null,['Python']),{coveredKeywords:[],projectEvidence:[]});
+console.log('PASS planning context uses keywords across all sections and project demonstrations, excludes contact and education sections');
