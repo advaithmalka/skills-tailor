@@ -33,7 +33,7 @@ To import Simplify keywords, open its **Resume Score** panel on a job page and c
 
 ## Sidebar and full-page views
 
-The toolbar opens the sidebar while capturing the exact job tab you clicked from. Open Simplify’s **Resume Score** panel first; its visible chips still import through **Use Simplify keywords**. **Refresh job** rereads the active job and its currently visible chips. If the browser has not granted temporary access to a different job tab, click **S** on that tab instead.
+The toolbar opens the sidebar while capturing the exact job tab you clicked from. Open Simplify’s **Resume Score** panel first; its visible chips still import through **Use Simplify keywords**. **Refresh Simplify** beside the job actions rereads the active job and imports its latest visible Simplify keywords into the review list, clearing the previous replacement draft. The sidebar stays open and the selected resume is preserved. If the browser has not granted temporary access to a different job tab, click **S** on that tab instead.
 
 Use **Full page ↗** in the sidebar to open the original spacious view. Your selected resume, pasted description, reviewed keywords, and replacement draft travel with it. **Open sidebar** returns that workflow to the sidebar. Both views share the local resume library and API-key storage; no credentials or PDF bytes are copied into the handoff. Sidebar drafts persist in session storage while the browser session lasts. A captured-job label identifies which posting the displayed workflow belongs to; switching browser tabs alone never silently rewrites a draft or scans another site.
 
@@ -81,6 +81,7 @@ node tests/score.cjs
 node tests/one-click.cjs
 node tests/incomplete.cjs
 node tests/overflow.cjs
+node tests/refresh.cjs
 node tests/sidebar.cjs
 ```
 
@@ -124,4 +125,4 @@ Luna errors/progress appear immediately below the action buttons that started th
 
 After filtering suggestions and resolving duplicates, the app measures each final Skills row using the PDF’s exact widths. If any row overflows, Luna gets one automatic repair request with the previous plan, the overfull row IDs, their current skills, and the excess width to remove. Fitting rows should be preserved. If the repair still overflows, the app removes lower-priority skills from that same row, remeasuring after every removal until it fits. It prefers removing unselected originals, then keywords already covered elsewhere, then lower-priority selected terms. The result message confirms the retry and any additional removals. This layout repair is separate from the response-token-limit retry. Project evidence informs planning; the displayed coverage score remains an exact keyword match.
 
-For an unpacked extension update, pull or download the updated code into the loaded folder, click **Reload** in the browser’s Extensions page, then close and reopen the sidebar. The footer displays **v1.3.3**. Updating a different copy of the repository does not update an already loaded extension.
+For an unpacked extension update, pull or download the updated code into the loaded folder, click **Reload** in the browser’s Extensions page, then close and reopen the sidebar. The footer displays **v1.3.4**. Updating a different copy of the repository does not update an already loaded extension.

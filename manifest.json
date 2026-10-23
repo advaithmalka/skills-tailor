@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Skills Tailor",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Review job keywords and replace only Skills in your original PDF, preserving its layout.",
   "permissions": [
     "storage",
