@@ -6,7 +6,7 @@ function captureVisibleJob(){
  for(const r of roots){
   const text=r===document?'':r.textContent||'';
   if(!text.includes('Only Matches'))continue;
-  const chips=Array.from(r.querySelectorAll('span.rounded-full')).filter(visible).filter(e=>e.className.includes('whitespace-nowrap')&&e.className.includes('border')).map(e=>({term:e.innerText.trim(),matched:e.className.includes('bg-primary-lightest')})).filter(c=>c.term&&c.term.length<80);
+  const chips=Array.from(r.querySelectorAll('span.rounded-full')).filter(visible).filter(e=>e.className.includes('whitespace-nowrap')&&e.className.includes('border')).map(e=>({term:e.innerText.trim(),matched:e.className.split(/\s+/).includes('bg-primary-lightest')})).filter(c=>c.term&&c.term.length<80);
   if(!chips.length)continue;
   const match=text.match(/Only Matches\s*(\d+)\s*out of\s*(\d+)\s*keywords?/i);
   const sourceText=Array.from(r.querySelectorAll('*')).filter(e=>e.childElementCount===0&&visible(e)).map(e=>e.textContent.trim()).filter(Boolean).join(' ');

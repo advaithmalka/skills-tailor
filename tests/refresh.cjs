@@ -10,10 +10,11 @@ const snapshot=expression=>JSON.parse(vm.runInContext('JSON.stringify('+expressi
  const action=elements.get('refresh-job').onclick,pending=action();
  assert.equal(requests,1);assert(elements.get('refresh-job').disabled);await action();assert.equal(requests,1,'double click does not repeat capture');
  // Storage notification arrives before the refresh response, as in the extension.
- vm.runInContext("globalThis.fresh={id:'new',title:'Current job',description:'Latest job text',simplify:{keywords:[{term:'SQL'},{term:'Python'}]}};applyCapture(fresh);",context);
+ vm.runInContext("globalThis.fresh={id:'new',title:'Current job',description:'Latest job text',simplify:{keywords:[{term:'SQL',matched:false},{term:'Python',matched:true}]}};applyCapture(fresh);",context);
  assert.equal(snapshot('state.pendingCapture.id'),'new');
  resolveCapture({capture:vm.runInContext('fresh',context)});await pending;
  assert.deepEqual(snapshot('state.keywords.map(k=>k.term)'),['SQL','Python'],'refresh imports latest chips immediately');
+ assert.deepEqual(snapshot('state.keywords.map(k=>k.matched)'),[false,true],'refresh preserves matched/missing flags');
  assert.deepEqual(snapshot('state.plan'),{},'stale draft is cleared');assert.equal(snapshot('state.source'),'Simplify');assert.equal(snapshot('state.pendingCapture'),null);
  assert.equal(snapshot('state.selected'),'master');assert.equal(snapshot('state.model.id'),'master-model');assert.equal(elements.get('job-description').value,'Latest job text');assert.equal(reloads,0,'sidebar never reloads');
  assert.match(elements.get('job-status').textContent,/Refreshed 2 Simplify keywords/);assert(!elements.get('refresh-job').disabled);

@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+require('../score.js');require('../ai.js');
+const chip=(term,matched,shown=true)=>({innerText:term,textContent:term,className:'rounded-full whitespace-nowrap border '+(matched?'bg-primary-lightest':'bg-white hover:bg-primary-lightest'),childElementCount:0,getClientRects:()=>shown?[{}]:[]});
+const displayed=[chip('end-to-end',true),chip('Python',false),chip('Hidden',true,false)];
+const shadow={textContent:'Only Matches 1 out of 2 keywords',querySelectorAll:selector=>selector==='span.rounded-full'?displayed:displayed};
+const captureContext=vm.createContext({document:{title:'Job',querySelectorAll:()=>[{shadowRoot:shadow}],querySelector:()=>null},getComputedStyle:()=>({visibility:'visible',display:'block'})});
+vm.runInContext(fs.readFileSync(__dirname+'/../capture.js','utf8'),captureContext);
+const capture=JSON.parse(vm.runInContext('JSON.stringify(captureVisibleJob())',captureContext));
+assert.deepEqual(capture.simplify.keywords,[{term:'end-to-end',matched:true},{term:'Python',matched:false}]);
+assert.equal(capture.simplify.matched,1);assert.equal(capture.simplify.total,2);
+function node(){return {hidden:true,value:'',disabled:false,textContent:'',children:[],style:{},attrs:{},listeners:{},classList:{toggle(){}},append(...children){this.children.push(...children)},replaceChildren(...children){this.children=children},setAttribute(key,value){this.attrs[key]=value},addEventListener(event,listener){this.listeners[event]=listener},querySelectorAll(){return []}};}
+const elements=new Map(),document={body:{classList:{toggle(){}}},createElement:()=>node(),getElementById(id){if(!elements.has(id))elements.set(id,node());return elements.get(id)},addEventListener(){}};
+const context=vm.createContext({document,location:{search:''},URLSearchParams,indexedDB:{open(){return {}}},ResumeScore,localStorage:{getItem:()=>null},capture});
+vm.runInContext(fs.readFileSync(__dirname+'/../app.js','utf8').replace(/start\(\);\s*$/,''),context);
+vm.runInContext("state.capture=capture;state.model={slots:[],pages:[{rows:[{chars:[...'Python'].map((text,id)=>({text,id,page:0}))}]}]};importSimplifyKeywords();",context);
+const [matched,missing]=elements.get('editable-chips').children;
+assert(matched.className.includes('matched'),'Simplify semantic match is highlighted even without literal PDF evidence');
+assert(!missing.className.includes('matched'),'Simplify missing status remains visible even when local text matches');
+assert.equal(matched.children[0].textContent,'Matched by Simplify');assert.equal(missing.children[0].textContent,'Missing in Simplify');
+assert.equal(matched.attrs['aria-pressed'],'true');assert.equal(missing.attrs['aria-pressed'],'true','match status does not deselect missing keywords');
+assert.equal(elements.get('score-value').textContent,50,'local draft score stays separate from captured match status');
+assert.equal(vm.runInContext("simplifyMatch('END-TO-END')",context),true);assert.equal(vm.runInContext("simplifyMatch('Unknown')",context),null);
+assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(simplifyPlanningEvidence(['end-to-end','Python','Unknown']))",context)),{simplifyMatchedKeywords:['end-to-end'],simplifyMissingKeywords:['Python']});
+const capturedPanel=elements.get('simplify-comparison').children.find(n=>n.className==='chips');
+assert.equal(capturedPanel.children[0].children[0].textContent,'Matched by Simplify');
+matched.listeners.click();assert.equal(matched.attrs['aria-pressed'],'true');assert.equal(vm.runInContext("simplifyMatch('end-to-end')",context),true,'planning selection never changes reported match');
+assert.equal(vm.runInContext('state.keywords[0].selected',context),false);
+(async()=>{
+ let request;
+ await TailorAI.suggest('sk-test','Python',[],['end-to-end','Python'],async(url,opts)=>{request=JSON.parse(opts.body);return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:'{"replacements":[]}'}]}]})};},{simplifyMatchedKeywords:['end-to-end'],simplifyMissingKeywords:['Python']});
+ assert.deepEqual(JSON.parse(request.input).simplifyMatchedKeywords,['end-to-end']);assert.deepEqual(JSON.parse(request.input).simplifyMissingKeywords,['Python']);assert.match(request.instructions,/Do not add those terms merely to force literal keyword matches/);
+ console.log('PASS visible Simplify matched/missing scraping, semantic-match badges, distinct planning selection, local score separation and planner evidence');
+})().catch(e=>{console.error(e);process.exit(1)});
