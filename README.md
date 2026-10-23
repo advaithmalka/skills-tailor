@@ -81,6 +81,7 @@ node tests/score.cjs
 node tests/one-click.cjs
 node tests/incomplete.cjs
 node tests/overflow.cjs
+node tests/preserve-skills.cjs
 node tests/refresh.cjs
 node tests/simplify-matches.cjs
 node tests/sidebar.cjs
@@ -126,8 +127,12 @@ Luna errors/progress appear immediately below the action buttons that started th
 
 After filtering suggestions and resolving duplicates, the app measures each final Skills row using the PDF’s exact widths. If any row overflows, Luna gets one automatic repair request with the previous plan, the overfull row IDs, their current skills, and the excess width to remove. Fitting rows should be preserved. If the repair still overflows, the app removes lower-priority skills from that same row, remeasuring after every removal until it fits. It prefers removing unselected originals, then keywords already covered elsewhere, then lower-priority selected terms. The result message confirms the retry and any additional removals. This layout repair is separate from the response-token-limit retry. Project evidence informs planning; the displayed coverage score remains an exact keyword match.
 
-For an unpacked extension update, pull or download the updated code into the loaded folder, click **Reload** in the browser’s Extensions page, then close and reopen the sidebar. The footer displays **v1.3.5**. Updating a different copy of the repository does not update an already loaded extension.
+For an unpacked extension update, pull or download the updated code into the loaded folder, click **Reload** in the browser’s Extensions page, then close and reopen the sidebar. The footer displays **v1.3.6**. Updating a different copy of the repository does not update an already loaded extension.
 
 ### Simplify matched and missing keywords (v1.3.5)
 
 Refresh Simplify captures each visible keyword’s matched/missing styling as well as its text. Review chips highlight Simplify matches and show matched/missing status on hover, independently of whether you include the keyword in planning. The Simplify snapshot shows these captured statuses; the separate **Local draft coverage** card keeps its exact-text calculation. Luna receives matched and missing keyword lists and prioritizes missing skills rather than adding literal duplicates of skills Simplify already recognizes. The last captured statuses stay fixed until the next refresh; upload your tailored PDF to Simplify and refresh to get its new assessment.
+
+### Preserve skills when they fit (v1.3.6)
+
+Luna keeps originals by default and only removes skills to make room on the same row. After planning and any overflow retry, exact PDF measurements restore deleted originals wherever they fit beside the additions, without introducing duplicates. Necessary deletions remain, and manual edits are unaffected.
