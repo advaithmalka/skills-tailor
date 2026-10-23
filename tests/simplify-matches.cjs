@@ -16,18 +16,18 @@ vm.runInContext("state.capture=capture;state.model={slots:[],pages:[{rows:[{char
 const [matched,missing]=elements.get('editable-chips').children;
 assert(matched.className.includes('matched'),'Simplify semantic match is highlighted even without literal PDF evidence');
 assert(!missing.className.includes('matched'),'Simplify missing status remains visible even when local text matches');
-assert.equal(matched.children[0].textContent,'Matched by Simplify');assert.equal(missing.children[0].textContent,'Missing in Simplify');
+assert.equal(matched.children.length,0,'no visible match-status label');assert.equal(missing.children.length,0,'no visible missing-status label');assert.match(matched.title,/Simplify at last refresh: matched/);assert.match(missing.title,/Simplify at last refresh: missing/);
 assert.equal(matched.attrs['aria-pressed'],'true');assert.equal(missing.attrs['aria-pressed'],'true','match status does not deselect missing keywords');
 assert.equal(elements.get('score-value').textContent,50,'local draft score stays separate from captured match status');
 assert.equal(vm.runInContext("simplifyMatch('END-TO-END')",context),true);assert.equal(vm.runInContext("simplifyMatch('Unknown')",context),null);
 assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(simplifyPlanningEvidence(['end-to-end','Python','Unknown']))",context)),{simplifyMatchedKeywords:['end-to-end'],simplifyMissingKeywords:['Python']});
 const capturedPanel=elements.get('simplify-comparison').children.find(n=>n.className==='chips');
-assert.equal(capturedPanel.children[0].children[0].textContent,'Matched by Simplify');
+assert.equal(capturedPanel.children[0].children.length,0);assert.match(capturedPanel.children[0].title,/Simplify at last refresh: matched/);
 matched.listeners.click();assert.equal(matched.attrs['aria-pressed'],'true');assert.equal(vm.runInContext("simplifyMatch('end-to-end')",context),true,'planning selection never changes reported match');
 assert.equal(vm.runInContext('state.keywords[0].selected',context),false);
 (async()=>{
  let request;
  await TailorAI.suggest('sk-test','Python',[],['end-to-end','Python'],async(url,opts)=>{request=JSON.parse(opts.body);return {ok:true,json:async()=>({status:'completed',output:[{content:[{type:'output_text',text:'{"replacements":[]}'}]}]})};},{simplifyMatchedKeywords:['end-to-end'],simplifyMissingKeywords:['Python']});
  assert.deepEqual(JSON.parse(request.input).simplifyMatchedKeywords,['end-to-end']);assert.deepEqual(JSON.parse(request.input).simplifyMissingKeywords,['Python']);assert.match(request.instructions,/Do not add those terms merely to force literal keyword matches/);
- console.log('PASS visible Simplify matched/missing scraping, semantic-match badges, distinct planning selection, local score separation and planner evidence');
+ console.log('PASS visible Simplify matched/missing scraping, semantic-match highlights, distinct planning selection, local score separation and planner evidence');
 })().catch(e=>{console.error(e);process.exit(1)});
